@@ -258,3 +258,133 @@ export function inspectBits(byte) {
     value: Number(bit)
   }));
 }
+
+/**
+ * Cấu hình mẫu định sẵn (Presets)
+ */
+export const PRESETS = [
+  {
+    id: 'default',
+    name: 'Mặc Định Nhà Sản Xuất',
+    desc: 'Baud 9600, AirRate 2.4k, CH 23 (433MHz), Max Power, FEC Bật',
+    badge: 'Khuyên dùng',
+    badgeColor: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    config: {
+      address: 0x0000,
+      uartBaud: 3,     // 9600
+      uartParity: 0,   // 8N1
+      airDataRate: 2,  // 2.4k
+      channel: 23,     // 433 MHz
+      fixedPoint: 0,   // Transparent
+      powerLevel: 0,   // Max Power
+      fec: 1,          // FEC On
+      ioDrive: 1,      // Push-Pull
+      wakeUpTime: 0    // 250ms
+    }
+  },
+  {
+    id: 'max-range',
+    name: 'Khoảng Cách Tối Đa (Long Range)',
+    desc: 'AirRate 0.3k (300bps) độ nhạy cao nhất, Max Power 20/30dBm, FEC Bật',
+    badge: 'Xuyên xa',
+    badgeColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    config: {
+      address: 0x0000,
+      uartBaud: 3,     // 9600
+      uartParity: 0,   // 8N1
+      airDataRate: 0,  // 0.3k (300 bps)
+      channel: 23,
+      fixedPoint: 0,
+      powerLevel: 0,
+      fec: 1,
+      ioDrive: 1,
+      wakeUpTime: 0
+    }
+  },
+  {
+    id: 'high-speed',
+    name: 'Tốc Độ Cao (High Speed)',
+    desc: 'UART 115200 bps, AirRate 19.2 kbps, độ trễ thấp cho luồng dữ liệu lớn',
+    badge: 'Nhanh nhất',
+    badgeColor: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    config: {
+      address: 0x0000,
+      uartBaud: 7,     // 115200
+      uartParity: 0,
+      airDataRate: 5,  // 19.2k
+      channel: 23,
+      fixedPoint: 0,
+      powerLevel: 0,
+      fec: 1,
+      ioDrive: 1,
+      wakeUpTime: 0
+    }
+  },
+  {
+    id: 'fixed-point',
+    name: 'Truyền Điểm-Điểm (Fixed-point Mesh)',
+    desc: 'Địa chỉ 0x0001, Chế độ truyền định điểm [ADDH][ADDL][CHAN][DATA]',
+    badge: 'Mạng lưới',
+    badgeColor: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    config: {
+      address: 0x0001,
+      uartBaud: 3,
+      uartParity: 0,
+      airDataRate: 2,
+      channel: 23,
+      fixedPoint: 1,   // Fixed point
+      powerLevel: 0,
+      fec: 1,
+      ioDrive: 1,
+      wakeUpTime: 0
+    }
+  }
+];
+
+/**
+ * Tạo mã nguồn C/C++ mẫu cho Arduino / ESP32
+ */
+export function generateCppCode(config, savePermanent = true) {
+  const bytes = encodeConfig(config, savePermanent);
+  const hexArray = Array.from(bytes).map(b => '0x' + b.toString(16).padStart(2, '0').toUpperCase()).join(', ');
+  const freq = calculateFrequency(config.band, config.channel);
+  const baudItem = UART_BAUD_RATES.find(b => b.value === config.uartBaud);
+  const baudRate = baudItem ? baudItem.rate : 9600;
+
+  return `// ============================================================================
+// Mã khởi tạo cấu hình E32 / AS32 cho Arduino / ESP32
+// Tần số: ${freq} MHz | Kênh: ${config.channel} | Baudrate: ${baudRate} bps
+// ============================================================================
+#include <Arduino.h>
+
+// Mảng 6-byte lệnh cấu hình
+const uint8_t LORA_CFG[6] = { ${hexArray} };
+
+void configureLoRa() {
+    // 1. Kéo chân M0=HIGH, M1=HIGH để module vào Mode 3 (Sleep/Config)
+    pinMode(32, OUTPUT); // M0
+    pinMode(33, OUTPUT); // M1
+    digitalWrite(32, HIGH);
+    digitalWrite(33, HIGH);
+    delay(50); // Chờ ổn định
+
+    // 2. Giao tiếp UART cấu hình luôn ở 9600 bps 8N1
+    Serial1.begin(9600, SERIAL_8N1, 26, 25); // RX=26, TX=25
+    delay(20);
+
+    // 3. Gửi chuỗi 6-byte cấu hình
+    Serial1.write(LORA_CFG, sizeof(LORA_CFG));
+    Serial1.flush();
+    delay(100);
+
+    // 4. Đưa M0=LOW, M1=LOW để trở lại Mode 0 (Normal) hoạt động
+    digitalWrite(32, LOW);
+    digitalWrite(33, LOW);
+    delay(50);
+
+    // 5. Khởi tạo lại UART với baudrate hoạt động đã cài đặt (${baudRate} bps)
+    Serial1.begin(${baudRate}, SERIAL_8N1, 26, 25);
+}
+`;
+}
+
