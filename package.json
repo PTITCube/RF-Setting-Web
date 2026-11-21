@@ -1,0 +1,27 @@
+{
+  "name": "rf-setting-web-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Universal Web Configurator for Ebyte E32 & Ashining AS32 LoRa Modules",
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix server start",
+    "install:all": "npm install && npm --prefix client install && npm --prefix server install"
+  },
+  "keywords": [
+    "e32",
+    "as32",
+    "ebyte",
+    "ashining",
+    "lora",
+    "rf-setting",
+    "asds",
+    "ptitcube",
+    "cubesat",
+    "webserial"
+  ],
+  "author": "PTITCube Team",
+  "license": "MIT"
+}
